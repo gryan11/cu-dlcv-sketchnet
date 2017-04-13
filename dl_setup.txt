@@ -1,0 +1,125 @@
+# I used an instance with 4 cpus, 1 gpu (tesla k80), 15Gb ram, 40 Gb hard drive
+# you will probably want to add your ssh key to the project wide ssh keys
+# the first time you start the instance you will need to ssh through the web interface for google to transfer ssh keys to it
+
+# you may also want to configure a static ip so it doesn't change
+# every time you stop and start the instance
+# https://cloud.google.com/compute/docs/configure-ip-addresses
+
+
+sudo add-apt-repository ppa:graphics-drivers/ppa
+sudo apt update
+
+sudo apt install nvidia-378 # as of 04/2017, may be higher version for you
+
+# download cuda:
+wget https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb
+
+# fix file extension
+mv cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64.deb
+
+sudo dpkg -i cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64.deb
+sudo apt update
+sudo apt install cuda
+
+# reboot the instance
+sudo reboot
+
+# check if working
+nvidia-smi
+
+# update paths in bashrc
+echo 'export PATH=/usr/local/cuda-8.0/bin:$PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/usr/local/cuda-8.0/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+
+# download cudnn from https://developer.nvidia.com/cudnn
+# you will need to register for cuda developer but its free
+# I HAD TO USE VERSION 5.1, 6 WAS NOT COMPATIBLE WITH TENSORFLOW 1.01
+# then scp to cloud instance
+
+tar -xvzf cudnn-8.0-linux-x64-v6.0.tgz # may need to change version
+
+# add library paths to bashrc
+export LD_LIBRARY_PATH=/home/ubuntu/cuda/lib64:$LD_LIBRARY_PATH
+export CPATH=/home/ubuntu/cuda/include:$CPATH
+export LIBRARY_PATH=/home/ubuntu/cuda/lib64:$LD_LIBRARY_PATH
+
+sudo apt-get install libcupti-dev
+
+# install pip
+sudo apt install python-pip 
+sudo -H pip install --upgrade pip
+
+# use pip to install tensorflow etc
+sudo -H pip install tensorflow-gpu  # Python 2.7;  GPU support
+sudo -H pip install numpy pandas matplotlib jupyter ipython keras h5py pillow
+
+# check tensorflow detects your gpu:
+python -c 'import tensorflow as tf; sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))'
+
+###################################
+# showed following for me:
+I tensorflow/stream_executor/dso_loader.cc:111] successfully opened CUDA library libcublas.so locally
+I tensorflow/stream_executor/dso_loader.cc:111] successfully opened CUDA library libcudnn.so locally
+I tensorflow/stream_executor/dso_loader.cc:111] successfully opened CUDA library libcufft.so locally
+I tensorflow/stream_executor/dso_loader.cc:111] successfully opened CUDA library libcuda.so.1 locally
+I tensorflow/stream_executor/dso_loader.cc:111] successfully opened CUDA library libcurand.so locally
+I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:925] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:951] Found device 0 with properties:
+name: Tesla K80
+major: 3 minor: 7 memoryClockRate (GHz) 0.8235
+pciBusID 0000:00:04.0
+Total memory: 11.17GiB
+Free memory: 504.56MiB
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:972] DMA: 0
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:982] 0:   Y
+I tensorflow/core/common_runtime/gpu/gpu_device.cc:1041] Creating TensorFlow device (/gpu:0) -> (device: 0, name: Tesla K80, pci bus id: 0000:00:04.0)
+Device mapping:
+/job:localhost/replica:0/task:0/gpu:0 -> device: 0, name: Tesla K80, pci bus id: 0000:00:04.0
+I tensorflow/core/common_runtime/direct_session.cc:252] Device mapping:
+/job:localhost/replica:0/task:0/gpu:0 -> device: 0, name: Tesla K80, pci bus id: 0000:00:04.0
+###################################
+
+# open port for jupyter notebook
+# on google console goto networking->Firewall rules
+#   click Create Firewall Rule
+#     Name: jupyter-tensorboardNetwork: default, Source Filter: allow from any source, Ports: tcp:8888-8890,6006
+#     click create
+
+# set up jupyter notebook
+jupyter notebook --generate-config
+ipython
+>from notebook.auth import passwd
+>passwd()
+Enter password:
+Verify password:
+Out[2]: 'sha1:67c9e60bb8b6:9ffede0825894254b2e042ea597d771089e11aed'
+
+# copy the output hash to your ~/.jupyter/jupyter_notebook_config.py
+# c.NotebookApp.password = <hashedpassword>
+
+# generate a self signed cert
+cd
+mkdir cert
+pushd cert
+openssl req -x509 -nodes -days 900 -newkey rsa:1024 -keyout mykey.key -out mycert.pem
+popd
+
+# add the certfile and keyfile to your jupyter notebook config
+#  ~/.jupyter/jupyter_notebook_config.py
+#  remember to change username to your username!
+c.NotebookApp.certfile = '/home/username/cert/mycert.pem'
+c.NotebookApp.keyfile = '/home/username/cert/mykey.key'
+
+# make notebook listen on public ip
+c.NotebookApp.ip = '*'
+
+# start the notebook in tmux so it doesn't stop when you disconnect
+
+tmux
+jupyter notebook
+
+# navigate to https://<instance public ip>:8888
+# you will get a warning saying the ssl cert is not trusted but continue 
+# enter your password to access the notebook
+# you should now have a working jupyter notebook running on a cloud hosted deep learning machine!
