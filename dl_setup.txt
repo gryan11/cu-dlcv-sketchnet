@@ -34,10 +34,12 @@ echo 'export LD_LIBRARY_PATH=/usr/local/cuda-8.0/lib64:$LD_LIBRARY_PATH' >> ~/.b
 
 # download cudnn from https://developer.nvidia.com/cudnn
 # you will need to register for cuda developer but its free
-# I HAD TO USE VERSION 5.1, 6 WAS NOT COMPATIBLE WITH TENSORFLOW 1.01
+# I HAD TO USE VERSION 5.1, VERSION 6 WAS NOT COMPATIBLE WITH TENSORFLOW 1.01
 # then scp to cloud instance
 
-tar -xvzf cudnn-8.0-linux-x64-v6.0.tgz # may need to change version
+tar -xvzf cudnn-8.0-linux-x64-v5.1.tgz # may need to change version to yours
+sudo cp -av cuda/include/* /usr/local/cuda/include
+sudo cp -av cuda/lib64/* /usr/local/cuda/lib64
 
 # add library paths to bashrc
 export LD_LIBRARY_PATH=/home/ubuntu/cuda/lib64:$LD_LIBRARY_PATH
