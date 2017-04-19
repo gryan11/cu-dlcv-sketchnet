@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from subprocess import call
+import glob, re, random
 
 def show_sample(X, y, prediction=None):
     im = X
@@ -30,3 +32,32 @@ def plots(ims, figsize=(12,6), rows=1, interp=False, titles=None):
         if titles is not None:
             sp.set_title(titles[i], fontsize=16)
         plt.imshow(ims[i], interpolation=None if interp else 'none', cmap=cmap)
+        
+def take_sample(orig_dir, sample_dir, num_classes):
+    # make sample dirs
+    call(['rm', '-r', sample_dir])
+    
+    call(['mkdir', sample_dir])
+    call(['mkdir', sample_dir+'/train'])
+    call(['mkdir', sample_dir+'/test'])
+    
+    
+    # get list of classes and pick ones to sample
+    train = sorted(glob.glob(orig_dir+'/train/*'))
+    test = sorted(glob.glob(orig_dir+'/test/*'))
+    
+    def getclass(c):
+        return re.search(r"\/([\w\-_]+)$", c).group(1)
+    
+    classes = sorted(list(map(getclass, train)))
+    
+    random.seed(0)
+    sample_classes = random.sample(classes, num_classes)
+    
+    # copy to sample dirs
+    for sample_class in sample_classes:        
+        train_src = next(c for c in train if sample_class in c)
+        test_src = next(c for c in test if sample_class in c)
+        
+        call(['cp', '-r', train_src, sample_dir+'/train/'])
+        call(['cp', '-r', test_src, sample_dir+'/test/'])
