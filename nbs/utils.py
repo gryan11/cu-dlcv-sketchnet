@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 from subprocess import call
 import glob, re, random
 
+from keras.preprocessing.image import ImageDataGenerator
+from keras import backend as K
+from keras.callbacks import TensorBoard, ModelCheckpoint
+
 def show_sample(X, y, prediction=None):
     im = X
     cmap = None
@@ -61,3 +65,65 @@ def take_sample(orig_dir, sample_dir, num_classes):
         
         call(['cp', '-r', train_src, sample_dir+'/train/'])
         call(['cp', '-r', test_src, sample_dir+'/test/'])
+        
+class ModelTrainer():
+    
+    def __init__(self,
+                 model,
+                 model_name,
+                 opt,
+                 train_generator,
+                 validation_generator,
+                 train_steps,
+                 val_steps):
+        self.total_epochs = 0
+        self.opt = opt
+        self.model = model
+        self.train_generator = train_generator
+        self.validation_generator = validation_generator
+        self.train_steps = train_steps
+        self.val_steps = val_steps
+        
+        call(['mkdir', '-p', '../logs/'+model_name])
+        call(['mkdir', '-p', '../models/'+model_name])
+
+        with open('../models/'+model_name+'/model.json', 'w') as f:
+            f.write(model.to_json())
+
+        self.log_cb =\
+            TensorBoard(log_dir='../logs/'+model_name+'/', 
+                        histogram_freq=0, 
+                        write_graph=False, write_images=False)
+        self.best_model_cb =\
+            ModelCheckpoint('../models/'+model_name+'/best.h5', 
+                            monitor='val_acc', verbose=0, 
+                            save_best_only=True, 
+                            mode='auto', period=1)
+        self.latest_model_cb =\
+            ModelCheckpoint('../models/'+model_name+'/latest.h5', 
+                            monitor='val_acc', verbose=0, 
+                            period=1)
+            
+    def train(self, epochs, lr):
+        K.set_value(self.opt.lr, lr)
+
+        hist = self.model.fit_generator(
+                self.train_generator,
+                steps_per_epoch = self.train_steps,
+                epochs = epochs + self.total_epochs,
+                validation_data = self.validation_generator,
+                validation_steps = self.val_steps,
+                verbose = 1,
+                initial_epoch = self.total_epochs,
+                callbacks=[self.log_cb, 
+                           self.best_model_cb,
+                           self.latest_model_cb]
+        )
+        self.total_epochs += epochs
+        
+        
+        
+        
+        
+        
+        
